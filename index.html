@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crypto Board Game</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+      color: #fff;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    h1 {
+      text-align: center;
+      font-size: 2.5em;
+      margin: 20px 0;
+      background: linear-gradient(45deg, #00f5ff, #ffd700);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    #container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      gap: 30px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    #boardWrapper {
+      position: relative;
+    }
+    #game {
+      display: grid;
+      grid-template-columns: repeat(11, 60px);
+      grid-template-rows: repeat(11, 60px);
+      gap: 0;
+      background: #222;
+      border: 3px solid #444;
+      border-radius: 10px;
+      padding: 0;
+      box-shadow: 0 10px 40px rgba(0, 255, 255, 0.3);
+    }
+    .cell {
+      width: 60px;
+      height: 60px;
+      background: #2a2a3e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: #fff;
+      position: relative;
+      border: 1px solid #444;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex-direction: column;
+      padding: 2px;
+    }
+    .cell:hover {
+      background: #3a3a4e;
+      transform: scale(1.05);
+    }
+    .cell.selected {
+      outline: 3px solid #ffd700;
+      outline-offset: -3px;
+      z-index: 10;
+    }
+    .cell.special {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-weight: bold;
+    }
+    .cell.start {
+      background: linear-gradient(135deg, #00f260 0%, #0575e6 100%);
+    }
+    .cell.empty {
+      background: transparent;
+      border: none;
+      pointer-events: none;
+    }
+    .owned {
+      border-top: 5px solid;
+    }
+    .owned.p0 { border-top-color: #ff6b6b; }
+    .owned.p1 { border-top-color: #4ecdc4; }
+    .owned.p2 { border-top-color: #ffe66d; }
+    .owned.p3 { border-top-color: #a8e6cf; }
+    
+    .players-here {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      display: flex;
+      gap: 2px;
+      flex-wrap: wrap;
+    }
+    .player-token {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+    }
+    .player-token.p0 { background: #ff6b6b; }
+    .player-token.p1 { background: #4ecdc4; }
+    .player-token.p2 { background: #ffe66d; }
+    .player-token.p3 { background: #a8e6cf; }
+    
+    .building {
+      font-size: 9px;
+      position: absolute;
+      bottom: 1px;
+      right: 2px;
+      background: rgba(255,215,0,0.3);
+      padding: 1px 3px;
+      border-radius: 3px;
+      font-weight: bold;
+    }
+    .price {
+      font-size: 13px;
+      font-weight: bold;
+      color: #ffd700;
+    }
+    #controls {
+      background: rgba(42, 42, 62, 0.9);
+      padding: 25px;
+      border-radius: 15px;
+      min-width: 350px;
+      border: 2px solid #444;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+    }
+    #players {
+      margin-bottom: 20px;
+    }
+    .player-info {
+      background: rgba(0,0,0,0.3);
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 8px;
+      border-left: 4px solid;
+      transition: all 0.3s;
+    }
+    .player-info.p0 { border-left-color: #ff6b6b; }
+    .player-info.p1 { border-left-color: #4ecdc4; }
+    .player-info.p2 { border-left-color: #ffe66d; }
+    .player-info.p3 { border-left-color: #a8e6cf; }
+    .player-info.active {
+      background: rgba(255,255,255,0.1);
+      transform: scale(1.05);
+      box-shadow: 0 0 15px rgba(255,215,0,0.3);
+    }
+    .player-info.bankrupt {
+      opacity: 0.4;
+      filter: grayscale(1);
+    }
+    button {
+      margin: 8px 5px;
+      padding: 12px 20px;
+      cursor: pointer;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: none;
+      color: white;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: bold;
+      transition: all 0.3s;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+    button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    button.primary {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+    }
+    button.primary:hover:not(:disabled) {
+      box-shadow: 0 6px 20px rgba(245, 87, 108, 0.6);
+    }
+    #diceResult {
+      font-size: 3em;
+      margin: 15px 0;
+      text-align: center;
+      min-height: 60px;
+    }
+    .dice-animation {
+      animation: roll 0.5s ease-in-out;
+    }
+    @keyframes roll {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(90deg); }
+      50% { transform: rotate(180deg); }
+      75% { transform: rotate(270deg); }
+    }
+    #log {
+      background: rgba(0,0,0,0.3);
+      padding: 15px;
+      border-radius: 8px;
+      max-height: 150px;
+      overflow-y: auto;
+      margin-top: 15px;
+      font-size: 12px;
+    }
+    .log-entry {
+      margin: 5px 0;
+      padding: 5px;
+      border-left: 2px solid #667eea;
+      padding-left: 8px;
+    }
+    #setup {
+      text-align: center;
+      background: rgba(42, 42, 62, 0.95);
+      padding: 40px;
+      border-radius: 15px;
+      max-width: 400px;
+      margin: 50px auto;
+      border: 2px solid #444;
+    }
+    #setup h2 {
+      color: #ffd700;
+      margin-bottom: 20px;
+    }
+    #setup select {
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 5px;
+      border: 2px solid #667eea;
+      background: #1a1a2e;
+      color: white;
+      margin: 10px 0;
+      width: 100%;
+    }
+    .stats {
+      font-size: 12px;
+      color: #aaa;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div id="setup">
+    <h2>🎮 Game Setup</h2>
+    <p>Number of Players:</p>
+    <select id="playerCount">
+      <option value="2">2 Players</option>
+      <option value="3">3 Players</option>
+      <option value="4">4 Players</option>
+    </select>
+    <br>
+    <button class="primary" onclick="startGame()" style="margin-top: 20px; font-size: 18px;">Start Game 🚀</button>
+  </div>
+
+  <div id="container" style="display: none;">
+    <div id="boardWrapper">
+      <h1>🎲 Crypto Board Game</h1>
+      <div id="game"></div>
+    </div>
+    
+    <div id="controls">
+      <div id="players"></div>
+      
+      <div id="diceResult"></div>
+      
+      <div id="powerups" style="margin: 15px 0; padding: 12px; background: rgba(0,0,0,0.3); border-radius: 8px;">
+        <strong>⚡ Power-Ups:</strong><br>
+        <button onclick="usePowerUp('double')" class="powerup" id="doubleBtn" style="font-size: 11px; padding: 6px 10px; margin: 3px;">2x Rent (100 ETH)</button>
+        <button onclick="usePowerUp('shield')" class="powerup" id="shieldBtn" style="font-size: 11px; padding: 6px 10px; margin: 3px;">Shield (80 ETH)</button>
+        <button onclick="usePowerUp('steal')" class="powerup" id="stealBtn" style="font-size: 11px; padding: 6px 10px; margin: 3px;">Steal (150 ETH)</button>
+      </div>
+      
+      <button class="primary" onclick="rollDice()" id="rollBtn">Roll Dice 🎲</button>
+      <br>
+      <button onclick="buyCell()" id="buyBtn">Buy Property 💰</button>
+      <button onclick="tradeProperty()" id="tradeBtn">Trade 🤝</button>
+      <br>
+      <button onclick="buildBuilding('🏦')" id="buildBtn">Bank (90 ETH)</button>
+      <button onclick="buildBuilding('📈')">Exchange (90 ETH)</button>
+      <br>
+      <button onclick="buildBuilding('⚡')">Farm (90 ETH)</button>
+      <button onclick="mortgageProperty()">Mortgage 🏚️</button>
+      
+      <div id="log"></div>
+      
+      <button onclick="resetGame()" style="margin-top: 15px; background: #555;">New Game 🔄</button>
+    </div>
+  </div>
+
+  <script>
+    let numPlayers = 2;
+    let players = [];
+    let currentPlayer = 0;
+    let cells = [];
+    let cellOwners = [];
+    let cellBuildings = [];
+    let cellMortgaged = [];
+    let gameStarted = false;
+    let diceRolled = false;
+    let consecutiveDoubles = 0;
+    let lastDice = [0, 0];
+
+    const BUILDING_COST = 90;
+    const BUILDING_INCOME = {
+      '🏦': 15,
+      '📈': 10,
+      '⚡': 20
+    };
+    
+    const POWERUP_COSTS = {
+      'double': 100,
+      'shield': 80,
+      'steal': 150
+    };
+
+    function startGame() {
+      numPlayers = parseInt(document.getElementById('playerCount').value);
+      document.getElementById('setup').style.display = 'none';
+      document.getElementById('container').style.display = 'flex';
+      initGame();
+    }
+
+    function initGame() {
+      players = [];
+      for (let i = 0; i < numPlayers; i++) {
+        players.push({
+          balance: 200,
+          position: 0,
+          properties: [],
+          income: 0,
+          bankrupt: false,
+          hasShield: false,
+          hasDoubleRent: false,
+          turnsInJail: 0
+        });
+      }
+      
+      currentPlayer = 0;
+      cellOwners = new Array(40).fill(null);
+      cellBuildings = new Array(40).fill([]);
+      cellMortgaged = new Array(40).fill(false);
+      gameStarted = true;
+      diceRolled = false;
+      consecutiveDoubles = 0;
+      
+      createBoard();
+      updateUI();
+      addLog("🎮 Game started! Players: " + numPlayers);
+    }
+
+    function createBoard() {
+      const game = document.getElementById("game");
+      game.innerHTML = '';
+      cells = [];
+
+      // Create 11x11 grid (40 outer cells + 9x9 inner empty space)
+      for (let row = 0; row < 11; row++) {
+        for (let col = 0; col < 11; col++) {
+          const cell = document.createElement("div");
+          cell.classList.add("cell");
+          
+          // Only outer ring is playable
+          if ((row === 0 || row === 10) || (col === 0 || col === 10)) {
+            let index = -1;
+            
+            // Calculate index for outer ring (clockwise from bottom-right)
+            if (row === 10) {
+              index = 10 - col; // Bottom row (right to left)
+            } else if (col === 0 && row < 10) {
+              index = 11 + (10 - row); // Left column (bottom to top)
+            } else if (row === 0) {
+              index = 21 + col; // Top row (left to right)
+            } else if (col === 10 && row > 0) {
+              index = 31 + row; // Right column (top to bottom)
+            }
+            
+            if (index >= 0 && index < 40) {
+              const price = Math.floor(Math.random() * 36) + 5;
+              
+              // Special cells
+              if (index === 0) {
+                cell.classList.add("start", "special");
+                cell.innerHTML = '<div style="font-size:10px;">START<br>+50 ETH</div>';
+              } else if (index === 10) {
+                cell.classList.add("special");
+                cell.innerHTML = '<div style="font-size:10px;">TAX<br>-20 ETH</div>';
+              } else if (index === 20) {
+                cell.classList.add("special");
+                cell.innerHTML = '<div style="font-size:10px;">JACKPOT<br>+100 ETH</div>';
+              } else if (index === 30) {
+                cell.classList.add("special");
+                cell.innerHTML = '<div style="font-size:10px;">JAIL<br>→ Start</div>';
+              } else {
+                cell.innerHTML = `<div class="price">Ξ${price}</div>`;
+                cell.dataset.price = price;
+              }
+              
+              cell.dataset.index = index;
+              cell.addEventListener("click", () => selectCell(index));
+              cells[index] = cell;
+            }
+          } else {
+            cell.classList.add("empty");
+            cell.innerHTML = '<div style="font-size:10px;color:#555;">CRYPTO<br>BOARD</div>';
+          }
+          
+          game.appendChild(cell);
+        }
+      }
+      
+      updatePlayerPositions();
+    }
+
+    function selectCell(index) {
+      cells.forEach(c => c && c.classList.remove("selected"));
+      if (cells[index]) {
+        cells[index].classList.add("selected");
+      }
+    }
+
+    function rollDice() {
+      if (players[currentPlayer].bankrupt) {
+        nextTurn();
+        return;
+      }
+      
+      if (diceRolled) {
+        addLog("⚠️ Already rolled! Finish your turn.");
+        return;
+      }
+      
+      // Check if in jail
+      if (players[currentPlayer].turnsInJail > 0) {
+        const dice1 = Math.floor(Math.random() * 6) + 1;
+        const dice2 = Math.floor(Math.random() * 6) + 1;
+        
+        if (dice1 === dice2) {
+          players[currentPlayer].turnsInJail = 0;
+          addLog(`🎉 Player ${currentPlayer + 1} rolled doubles and escaped jail!`);
+          movePlayer(dice1 + dice2);
+        } else {
+          players[currentPlayer].turnsInJail--;
+          addLog(`🔒 Player ${currentPlayer + 1} stays in jail. Turns left: ${players[currentPlayer].turnsInJail}`);
+          if (players[currentPlayer].turnsInJail === 0) {
+            addLog(`🆓 Player ${currentPlayer + 1} is released from jail!`);
+          }
+        }
+        diceRolled = true;
+        setTimeout(() => nextTurn(), 2000);
+        return;
+      }
+
+      const dice1 = Math.floor(Math.random() * 6) + 1;
+      const dice2 = Math.floor(Math.random() * 6) + 1;
+      const total = dice1 + dice2;
+      lastDice = [dice1, dice2];
+      
+      const resultDiv = document.getElementById("diceResult");
+      resultDiv.textContent = "🎲";
+      resultDiv.classList.add("dice-animation");
+      
+      setTimeout(() => {
+        resultDiv.textContent = `🎲 ${dice1} + ${dice2} = ${total}`;
+        resultDiv.classList.remove("dice-animation");
+        
+        // Check for doubles
+        if (dice1 === dice2) {
+          consecutiveDoubles++;
+          addLog(`🎲 Player ${currentPlayer + 1} rolled doubles! (${consecutiveDoubles}/3)`);
+          
+          if (consecutiveDoubles === 3) {
+            addLog(`🚔 Three doubles in a row! Player ${currentPlayer + 1} goes to jail!`);
+            players[currentPlayer].turnsInJail = 3;
+            players[currentPlayer].position = 30;
+            consecutiveDoubles = 0;
+            updatePlayerPositions();
+            diceRolled = true;
+            setTimeout(() => nextTurn(), 2000);
+            return;
+          }
+        } else {
+          consecutiveDoubles = 0;
+        }
+        
+        movePlayer(total);
+        diceRolled = true;
+        
+        // If rolled doubles, can roll again
+        if (dice1 === dice2) {
+          setTimeout(() => {
+            diceRolled = false;
+            addLog(`🎲 Player ${currentPlayer + 1} can roll again!`);
+          }, 1500);
+        } else {
+          setTimeout(() => {
+            nextTurn();
+          }, 2000);
+        }
+      }, 500);
+    }
+
+    function movePlayer(steps) {
+      const player = players[currentPlayer];
+      const oldPos = player.position;
+      player.position = (player.position + steps) % 40;
+      
+      // Pass START bonus
+      if (player.position < oldPos) {
+        player.balance += 50;
+        addLog(`🎉 Player ${currentPlayer + 1} passed START! +50 ETH`);
+      }
+      
+      updatePlayerPositions();
+      handleCellLanding();
+      updateUI();
+    }
+
+    function handleCellLanding() {
+      const player = players[currentPlayer];
+      const pos = player.position;
+      const cell = cells[pos];
+      
+      // Special cells
+      if (pos === 0) {
+        // Start - already handled
+      } else if (pos === 10) {
+        player.balance -= 20;
+        addLog(`💸 Player ${currentPlayer + 1} paid tax: -20 ETH`);
+      } else if (pos === 20) {
+        player.balance += 100;
+        addLog(`🎰 Player ${currentPlayer + 1} won jackpot! +100 ETH`);
+      } else if (pos === 30) {
+        player.turnsInJail = 3;
+        addLog(`🚔 Player ${currentPlayer + 1} went to jail! 3 turns locked`);
+      } else {
+        // Regular cell - check ownership
+        const owner = cellOwners[pos];
+        if (owner !== null && owner !== currentPlayer && !cellMortgaged[pos]) {
+          if (!player.hasShield) {
+            let rent = calculateRent(pos);
+            if (players[owner].hasDoubleRent) {
+              rent *= 2;
+              addLog(`⚡ Double rent applied!`);
+              players[owner].hasDoubleRent = false;
+            }
+            player.balance -= rent;
+            players[owner].balance += rent;
+            addLog(`💰 Player ${currentPlayer + 1} paid ${rent} ETH rent to Player ${owner + 1}`);
+          } else {
+            addLog(`🛡️ Player ${currentPlayer + 1}'s shield blocked the rent!`);
+            player.hasShield = false;
+          }
+        }
+      }
+      
+      checkBankruptcy();
+      updateUI();
+    }
+
+    function calculateRent(pos) {
+      const basePrice = parseInt(cells[pos].dataset.price) || 10;
+      const buildings = cellBuildings[pos] || [];
+      return basePrice + (buildings.length * 10);
+    }
+
+    function buyCell() {
+      const pos = players[currentPlayer].position;
+      const cell = cells[pos];
+      
+      if (!cell || cell.classList.contains("special")) {
+        addLog("⚠️ This cell cannot be purchased!");
+        return;
+      }
+      
+      if (cellOwners[pos] !== null) {
+        addLog("⚠️ Cell already owned!");
+        return;
+      }
+      
+      const price = parseInt(cell.dataset.price);
+      if (players[currentPlayer].balance < price) {
+        addLog("⚠️ Not enough ETH!");
+        return;
+      }
+      
+      players[currentPlayer].balance -= price;
+      players[currentPlayer].properties.push(pos);
+      cellOwners[pos] = currentPlayer;
+      
+      cell.classList.add("owned", `p${currentPlayer}`);
+      addLog(`🏠 Player ${currentPlayer + 1} bought property for ${price} ETH`);
+      updateUI();
+    }
+
+    function buildBuilding(type) {
+      const pos = players[currentPlayer].position;
+      
+      if (cellOwners[pos] !== currentPlayer) {
+        addLog("⚠️ Can only build on your own property!");
+        return;
+      }
+      
+      if (cellMortgaged[pos]) {
+        addLog("⚠️ Cannot build on mortgaged property!");
+        return;
+      }
+      
+      if (players[currentPlayer].balance < BUILDING_COST) {
+        addLog("⚠️ Not enough ETH to build!");
+        return;
+      }
+      
+      players[currentPlayer].balance -= BUILDING_COST;
+      cellBuildings[pos].push(type);
+      players[currentPlayer].income += BUILDING_INCOME[type];
+      
+      const buildingDiv = document.createElement("div");
+      buildingDiv.classList.add("building");
+      buildingDiv.textContent = type;
+      cells[pos].appendChild(buildingDiv);
+      
+      addLog(`🏗️ Player ${currentPlayer + 1} built ${type} (+${BUILDING_INCOME[type]} ETH/turn)`);
+      updateUI();
+    }
+    
+    function mortgageProperty() {
+      const pos = players[currentPlayer].position;
+      
+      if (cellOwners[pos] !== currentPlayer) {
+        addLog("⚠️ Can only mortgage your own property!");
+        return;
+      }
+      
+      if (cellBuildings[pos].length > 0) {
+        addLog("⚠️ Remove buildings before mortgaging!");
+        return;
+      }
+      
+      const price = parseInt(cells[pos].dataset.price);
+      const mortgageValue = Math.floor(price * 0.5);
+      
+      if (cellMortgaged[pos]) {
+        // Unmortgage
+        const unmortgageCost = Math.floor(mortgageValue * 1.1);
+        if (players[currentPlayer].balance < unmortgageCost) {
+          addLog("⚠️ Not enough ETH to unmortgage!");
+          return;
+        }
+        players[currentPlayer].balance -= unmortgageCost;
+        cellMortgaged[pos] = false;
+        cells[pos].style.opacity = "1";
+        addLog(`🏚️ Player ${currentPlayer + 1} unmortgaged property for ${unmortgageCost} ETH`);
+      } else {
+        // Mortgage
+        players[currentPlayer].balance += mortgageValue;
+        cellMortgaged[pos] = true;
+        cells[pos].style.opacity = "0.5";
+        addLog(`💵 Player ${currentPlayer + 1} mortgaged property for ${mortgageValue} ETH`);
+      }
+      
+      updateUI();
+    }
+    
+    function tradeProperty() {
+      const pos = players[currentPlayer].position;
+      
+      if (cellOwners[pos] !== currentPlayer) {
+        addLog("⚠️ Select your own property to trade!");
+        return;
+      }
+      
+      if (cellBuildings[pos].length > 0) {
+        addLog("⚠️ Remove buildings before trading!");
+        return;
+      }
+      
+      const targetPlayer = prompt(`Enter player number to trade with (1-${numPlayers}):`);
+      const targetIdx = parseInt(targetPlayer) - 1;
+      
+      if (isNaN(targetIdx) || targetIdx < 0 || targetIdx >= numPlayers || targetIdx === currentPlayer) {
+        addLog("⚠️ Invalid player!");
+        return;
+      }
+      
+      if (players[targetIdx].bankrupt) {
+        addLog("⚠️ Cannot trade with bankrupt player!");
+        return;
+      }
+      
+      const price = parseInt(prompt(`Enter trade price (ETH):`) || "0");
+      
+      if (isNaN(price) || price < 0) {
+        addLog("⚠️ Invalid price!");
+        return;
+      }
+      
+      if (players[targetIdx].balance < price) {
+        addLog("⚠️ Target player doesn't have enough ETH!");
+        return;
+      }
+      
+      // Execute trade
+      players[currentPlayer].balance += price;
+      players[targetIdx].balance -= price;
+      
+      players[currentPlayer].properties = players[currentPlayer].properties.filter(p => p !== pos);
+      players[targetIdx].properties.push(pos);
+      
+      cellOwners[pos] = targetIdx;
+      cells[pos].classList.remove(`p${currentPlayer}`);
+      cells[pos].classList.add(`p${targetIdx}`);
+      
+      addLog(`🤝 Player ${currentPlayer + 1} traded property to Player ${targetIdx + 1} for ${price} ETH`);
+      updateUI();
+    }
+    
+    function usePowerUp(type) {
+      const cost = POWERUP_COSTS[type];
+      
+      if (players[currentPlayer].balance < cost) {
+        addLog("⚠️ Not enough ETH for power-up!");
+        return;
+      }
+      
+      players[currentPlayer].balance -= cost;
+      
+      switch(type) {
+        case 'double':
+          players[currentPlayer].hasDoubleRent = true;
+          addLog(`⚡ Player ${currentPlayer + 1} activated 2x Rent for next property!`);
+          break;
+        case 'shield':
+          players[currentPlayer].hasShield = true;
+          addLog(`🛡️ Player ${currentPlayer + 1} activated Rent Shield!`);
+          break;
+        case 'steal':
+          const richestIdx = players.reduce((maxIdx, p, i) => 
+            (!p.bankrupt && i !== currentPlayer && p.balance > players[maxIdx].balance) ? i : maxIdx, 
+            (currentPlayer + 1) % numPlayers
+          );
+          if (!players[richestIdx].bankrupt && richestIdx !== currentPlayer) {
+            const stolen = Math.min(50, players[richestIdx].balance);
+            players[richestIdx].balance -= stolen;
+            players[currentPlayer].balance += stolen;
+            addLog(`💰 Player ${currentPlayer + 1} stole ${stolen} ETH from Player ${richestIdx + 1}!`);
+          }
+          break;
+      }
+      
+      updateUI();
+    }
+
+    function nextTurn() {
+      diceRolled = false;
+      
+      // Collect income from buildings
+      if (players[currentPlayer].income > 0) {
+        players[currentPlayer].balance += players[currentPlayer].income;
+      }
+      
+      do {
+        currentPlayer = (currentPlayer + 1) % numPlayers;
+      } while (players[currentPlayer].bankrupt);
+      
+      consecutiveDoubles = 0;
+      updateUI();
+      checkWinCondition();
+    }
+
+    function checkBankruptcy() {
+      if (players[currentPlayer].balance < 0) {
+        players[currentPlayer].bankrupt = true;
+        addLog(`💀 Player ${currentPlayer + 1} went bankrupt!`);
+        
+        // Free all properties
+        players[currentPlayer].properties.forEach(pos => {
+          cellOwners[pos] = null;
+          cells[pos].classList.remove("owned", `p${currentPlayer}`);
+          cellMortgaged[pos] = false;
+          cells[pos].style.opacity = "1";
+        });
+      }
+    }
+
+    function checkWinCondition() {
+      const activePlayers = players.filter(p => !p.bankrupt).length;
+      if (activePlayers === 1) {
+        const winner = players.findIndex(p => !p.bankrupt);
+        addLog(`🏆 VICTORY! Player ${winner + 1} won the game!`);
+        document.getElementById("rollBtn").disabled = true;
+      }
+    }
+
+    function updatePlayerPositions() {
+      // Clear all tokens
+      cells.forEach(cell => {
+        if (cell) {
+          const oldTokens = cell.querySelector('.players-here');
+          if (oldTokens) oldTokens.remove();
+        }
+      });
+      
+      // Add tokens to current positions
+      players.forEach((player, i) => {
+        if (!player.bankrupt) {
+          const cell = cells[player.position];
+          if (cell) {
+            let container = cell.querySelector('.players-here');
+            if (!container) {
+              container = document.createElement('div');
+              container.classList.add('players-here');
+              cell.appendChild(container);
+            }
+            const token = document.createElement('div');
+            token.classList.add('player-token', `p${i}`);
+            container.appendChild(token);
+          }
+        }
+      });
+    }
+
+    function updateUI() {
+      const playersDiv = document.getElementById("players");
+      playersDiv.innerHTML = players.map((p, i) => `
+        <div class="player-info p${i} ${i === currentPlayer ? 'active' : ''} ${p.bankrupt ? 'bankrupt' : ''}">
+          <strong>Игрок ${i + 1}</strong> ${p.bankrupt ? '💀' : ''}<br>
+          💰 ${p.balance} ETH<br>
+          <div class="stats">🏠 ${p.properties.length} | 📊 +${p.income}/ход</div>
+        </div>
+      `).join('');
+    }
+
+    function addLog(message) {
+      const log = document.getElementById("log");
+      const entry = document.createElement("div");
+      entry.classList.add("log-entry");
+      entry.textContent = message;
+      log.insertBefore(entry, log.firstChild);
+      
+      // Keep only last 10 entries
+      while (log.children.length > 10) {
+        log.removeChild(log.lastChild);
+      }
+    }
+
+    function resetGame() {
+      document.getElementById('setup').style.display = 'block';
+      document.getElementById('container').style.display = 'none';
+      document.getElementById('log').innerHTML = '';
+      document.getElementById('diceResult').textContent = '';
+      document.getElementById("rollBtn").disabled = false;
+    }
+  </script>
+</body>
+</html>
